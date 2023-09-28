@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+	<body>
+		<canvas></canvas>
+		<button onclick="pass()">Pass</button>
+		<div></div>
+		<a></a>
+		<p>A slightly bizzare way to play Go-by-mail. Make a move, then give your opponent the resulting url and wait for their response.</p>
+		<script>
+			var c = document.querySelector("canvas");
+			var ctx = c.getContext("2d");
+			
+			var size = 640;
+			c.width = size;
+			c.height = size;
+
+			var background = new Image();
+			background.src = "background.webp"
+			
+			var params = new URLSearchParams(location.search);
+			var state = params.get("s");
+			if (!state) state = "";
+
+			class Go {
+				constructor(turns = "") {
+					this.boards = [];
+					this.boards.push([]);
+					for (var i = 0; i < 19 * 19; i++) this.boards[0].push(0);
+					this.turn = true;
+					this.turns = "";
+					this.passes = 0;
+					for (var i = 0; i < turns.length; i += 2)
+						if (turns[i] + turns[i + 1] == "pa")
+							this.pass();
+						else if (!this.move(turns.charCodeAt(i) - 97, turns.charCodeAt(i + 1) - 97))
+							break;
+				}
+
+				toi(x, y) { return 0 <= x && x < 19 && 0 <= y && y < 19 ? x + y * 19 : -1; }
+
+				draw() {
+					for (var x = 0.6; x < 19; x++)
+						for (var y = 0.6; y < 19; y++) {	
+							var piece = this.boards[this.boards.length - 1][this.toi(x - 0.6, y - 0.6)];
+							if (!piece) continue;
+							ctx.fillStyle = piece == 1 ? "#000" : "#fff";
+							ctx.beginPath();
+							ctx.arc(x * size / 19.2, y * size / 19.2, size / 50, 0, 2 * Math.PI);
+							ctx.fill();
+						}
+				}
+
+				pre(x, y) {
+					if (!this.test(x, y)) return;
+					ctx.fillStyle = this.turn ? "#0008" : "#fff8";
+					ctx.beginPath();
+					ctx.arc((x + 0.6) * size / 19.2, (y + 0.6) * size / 19.2, size / 50, 0, 2 * Math.PI);
+					ctx.fill();
+				}
+
+				pass() {
+					if (this.passes++ >= 2) return;
+					this.turn = !this.turn;
+					this.turns += "pa";
+				}
+
+				test(x, y) {
+					if (!this.move(x, y)) return false;
+					this.boards.pop();
+					this.turn = !this.turn;
+					this.turns = this.turns.substring(0, this.turns.length - 2);
+					return true;
+				}
+
+				move(x, y) {
+					if (this.passes++ >= 2) return false;
+					this.passes = 0;
+					var i = this.toi(x, y);
+					if (i == -1 || this.boards[this.boards.length - 1][i]) return false;
+					this.boards.push(this.boards[this.boards.length - 1].slice());
+					this.boards[this.boards.length - 1][i] = this.turn ? 1 : 2;
+
+					this.capture(this.turn ? 2 : 1);
+					if (this.capture(this.turn ? 1 : 2))
+						return this.boards.pop() === false;
+
+					for (var i = 0; i < this.boards.length - 1; i++)
+						if (this.boards[i].join("") == this.boards[this.boards.length - 1].join(""))
+							return this.boards.pop() === false;
+					
+					this.turn = !this.turn;
+					this.turns += "abcdefghijklmnopqrs"[x] + "abcdefghijklmnopqrs"[y];
+					return true;
+				}
+
+				capture(color) {
+					var captured = false;
+					for (var x = 0; x < 19; x++)
+						for (var y = 0; y < 19; y++) {
+							this.checked = [];
+							if (!this.check(x, y, color))
+								captured = this.kill(x, y, color);
+						}
+					return captured;
+				}
+
+				check(x, y, color) { // cant recurse cuz infinite loop
+					var i = this.toi(x, y);
+					if (this.checked.indexOf(i) != -1) return false;
+					this.checked.push(i);
+					if (i == -1) return false;
+					if (this.boards[this.boards.length - 1][i] == 0) return true;
+					if (this.boards[this.boards.length - 1][i] != color) return false;
+					return this.check(x + 1, y, color)
+					    || this.check(x - 1, y, color)
+							|| this.check(x, y + 1, color)
+							|| this.check(x, y - 1, color);
+				}
+
+				kill(x, y, color) {
+					var i = this.toi(x, y);
+					if (i == -1) return false;
+					if (this.boards[this.boards.length - 1][i] != color) return false;
+					this.boards[this.boards.length - 1][i] = 0;
+					this.kill(x + 1, y, color);
+					this.kill(x - 1, y, color);
+					this.kill(x, y + 1, color);
+					this.kill(x, y - 1, color);
+					return true;
+				}
+
+				score() {
+					var black = 0;
+					var white = 0;
+					for (var x = 0; x < 19; x++)
+						for (var y = 0; y < 19; y++) {
+							this.checked = [];
+							black += this.territory(x, y, 1) ? 1 : 0;
+							this.checked = [];
+							white += this.territory(x, y, 2) ? 1 : 0;
+						}
+					return black + " - " + white;
+				}
+
+				territory(x, y, color) {
+					var i = this.toi(x, y);
+					if (this.checked.indexOf(i) != -1) return true;
+					this.checked.push(i);
+					if (i == -1) return true;
+					if (this.boards[this.boards.length - 1][i] == color) return true;
+					if (this.boards[this.boards.length - 1][i] != color) return false;
+					return this.check(x + 1, y, color)
+					    && this.check(x - 1, y, color)
+							&& this.check(x, y + 1, color)
+							&& this.check(x, y - 1, color);
+				}
+			}
+
+			let game = new Go(state);
+			var moved = false;
+			var mx, my;
+
+			if (game.passes >= 2) calc();
+
+			c.onmousemove = function(e) {
+				mx = Math.floor(e.x * 19.2 / size - 0.35);
+				my = Math.floor(e.y * 19.2 / size - 0.35);
+			}
+			c.onmousedown = function(e) {
+				if (!moved)
+					if (game.move(mx, my))
+						calc();
+			}
+			function pass() {
+				if (moved) return;
+				game.pass();
+				calc();
+			}
+
+			function calc() {
+				moved = true;
+				document.querySelector("button").style.display = 'none';
+				if (game.passes >= 2) { document.querySelector("div").innerHTML = game.score(); return; }
+				var domain = (/^[^?]*/).exec(window.location.href)[0];
+				var url = domain + "?s=" + game.turns
+				document.querySelector("a").href = url;
+				document.querySelector("a").innerHTML = url;
+			}
+
+
+			function loop() {
+				ctx.drawImage(background, 0, 0, size, size);
+				game.draw();
+				if (!moved)
+					game.pre(mx, my);
+				requestAnimationFrame(loop);
+			}
+
+			background.onload = loop();
+		</script>
+	</body>
+</html>

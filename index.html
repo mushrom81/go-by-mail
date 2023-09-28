@@ -30,7 +30,7 @@
 					this.turns = "";
 					this.passes = 0;
 					for (var i = 0; i < turns.length; i += 2)
-						if (turns[i] + turns[i + 1] == "pa")
+						if (turns[i] + turns[i + 1] == "ta")
 							this.pass();
 						else if (!this.move(turns.charCodeAt(i) - 97, turns.charCodeAt(i + 1) - 97))
 							break;
@@ -61,7 +61,7 @@
 				pass() {
 					if (this.passes++ >= 2) return;
 					this.turn = !this.turn;
-					this.turns += "pa";
+					this.turns += "ta";
 				}
 
 				test(x, y) {

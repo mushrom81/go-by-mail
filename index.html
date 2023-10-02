@@ -1,26 +1,28 @@
 <!DOCTYPE html>
 <html>
 	<body>
-		<canvas></canvas>
-		<button onclick="pass()">Pass</button>
-		<div></div>
-		<a></a>
 		<p>A slightly bizzare way to play Go-by-mail. Make a move, then give your opponent the resulting url and wait for their response.</p>
+		<canvas id="goScreen"></canvas>
+		<button id="goPass" onclick="pass()">Pass</button>
+		<p>
+			<a id="goScore"></a>
+			<a id="goLink"></a>
+		</p>
 		<script>
-			var c = document.querySelector("canvas");
+			var c = document.querySelector("#goScreen");
 			var ctx = c.getContext("2d");
 			
-			var size = 640;
+			var size = 480;
 			c.width = size;
 			c.height = size;
-
+		
 			var background = new Image();
 			background.src = "background.webp"
 			
 			var params = new URLSearchParams(location.search);
 			var state = params.get("s");
 			if (!state) state = "";
-
+		
 			class Go {
 				constructor(turns = "") {
 					this.boards = [];
@@ -30,26 +32,28 @@
 					this.turns = "";
 					this.passes = 0;
 					for (var i = 0; i < turns.length; i += 2)
-						if (turns[i] + turns[i + 1] == "ta")
+						if (turns[i] + turns[i + 1] == "au")
 							this.pass();
-						else if (!this.move(turns.charCodeAt(i) - 97, turns.charCodeAt(i + 1) - 97))
+						else if (!this.move(this.cto(turns.charCodeAt(i) - 97), this.cto(turns.charCodeAt(i + 1) - 97)))
 							break;
 				}
-
-				toi(x, y) { return 0 <= x && x < 19 && 0 <= y && y < 19 ? x + y * 19 : -1; }
-
+				
+				cto(c) { if (c < 8) return c; else return c - 1; }
+		
+				toi(x, y) { return (0 <= x && x < 19 && 0 <= y && y < 19) ? x + y * 19 : -1; }
+		
 				draw() {
-					for (var x = 0.6; x < 19; x++)
-						for (var y = 0.6; y < 19; y++) {	
-							var piece = this.boards[this.boards.length - 1][this.toi(x - 0.6, y - 0.6)];
-							if (!piece) continue;
+					for (var x = 0; x < 19; x++)
+						for (var y = 0; y < 19; y++) {
+							var piece = this.boards[this.boards.length - 1][this.toi(x, y)];
+							if (piece == 0) continue;
 							ctx.fillStyle = piece == 1 ? "#000" : "#fff";
 							ctx.beginPath();
-							ctx.arc(x * size / 19.2, y * size / 19.2, size / 50, 0, 2 * Math.PI);
+							ctx.arc((x + 0.6) * size / 19.2, (y + 0.6) * size / 19.2, size / 50, 0, 2 * Math.PI);
 							ctx.fill();
 						}
 				}
-
+		
 				pre(x, y) {
 					if (!this.test(x, y)) return;
 					ctx.fillStyle = this.turn ? "#0008" : "#fff8";
@@ -57,13 +61,13 @@
 					ctx.arc((x + 0.6) * size / 19.2, (y + 0.6) * size / 19.2, size / 50, 0, 2 * Math.PI);
 					ctx.fill();
 				}
-
+		
 				pass() {
 					if (this.passes++ >= 2) return;
 					this.turn = !this.turn;
-					this.turns += "ta";
+					this.turns += "au";
 				}
-
+		
 				test(x, y) {
 					if (!this.move(x, y)) return false;
 					this.boards.pop();
@@ -71,40 +75,40 @@
 					this.turns = this.turns.substring(0, this.turns.length - 2);
 					return true;
 				}
-
+		
 				move(x, y) {
 					if (this.passes++ >= 2) return false;
 					this.passes = 0;
 					var i = this.toi(x, y);
-					if (i == -1 || this.boards[this.boards.length - 1][i]) return false;
+					if (i == -1 || this.boards[this.boards.length - 1][i] != 0) return false;
 					this.boards.push(this.boards[this.boards.length - 1].slice());
 					this.boards[this.boards.length - 1][i] = this.turn ? 1 : 2;
-
+		
 					this.capture(this.turn ? 2 : 1);
 					if (this.capture(this.turn ? 1 : 2))
 						return this.boards.pop() === false;
-
+		
 					for (var i = 0; i < this.boards.length - 1; i++)
 						if (this.boards[i].join("") == this.boards[this.boards.length - 1].join(""))
 							return this.boards.pop() === false;
 					
 					this.turn = !this.turn;
-					this.turns += "abcdefghijklmnopqrs"[x] + "abcdefghijklmnopqrs"[y];
+					this.turns += "abcdefghjklmnopqrst"[x] + "abcdefghjklmnopqrst"[y];
 					return true;
 				}
-
+		
 				capture(color) {
 					var captured = false;
 					for (var x = 0; x < 19; x++)
 						for (var y = 0; y < 19; y++) {
 							this.checked = [];
 							if (!this.check(x, y, color))
-								captured = this.kill(x, y, color);
+								captured |= this.kill(x, y, color);
 						}
 					return captured;
 				}
-
-				check(x, y, color) { // cant recurse cuz infinite loop
+		
+				check(x, y, color) {
 					var i = this.toi(x, y);
 					if (this.checked.indexOf(i) != -1) return false;
 					this.checked.push(i);
@@ -116,7 +120,7 @@
 							|| this.check(x, y + 1, color)
 							|| this.check(x, y - 1, color);
 				}
-
+		
 				kill(x, y, color) {
 					var i = this.toi(x, y);
 					if (i == -1) return false;
@@ -128,7 +132,7 @@
 					this.kill(x, y - 1, color);
 					return true;
 				}
-
+		
 				score() {
 					var black = 0;
 					var white = 0;
@@ -139,9 +143,9 @@
 							this.checked = [];
 							white += this.territory(x, y, 2) ? 1 : 0;
 						}
-					return black + " - " + white;
+					return black + " - " + (white + 6.5);
 				}
-
+		
 				territory(x, y, color) {
 					var i = this.toi(x, y);
 					if (this.checked.indexOf(i) != -1) return true;
@@ -155,16 +159,25 @@
 							&& this.check(x, y - 1, color);
 				}
 			}
-
+		
 			let game = new Go(state);
+			if (game.turns.length >= 2) {
+				var action;
+				if (game.turns[game.turns.length - 2] == 'u') action = "Pass";
+				else action =
+					"abcdefghjklmnopqrst"[game.cto(game.turns.charCodeAt(game.turns.length - 2) - 97)] +
+					(game.cto(game.turns.charCodeAt(game.turns.length - 1) - 97) + 1)
+				document.querySelector("#goLink").innerHTML = (game.turn ? "White: " : "Black: ") + action;
+			}
 			var moved = false;
 			var mx, my;
-
+		
 			if (game.passes >= 2) calc();
-
+		
 			c.onmousemove = function(e) {
-				mx = Math.floor(e.x * 19.2 / size - 0.35);
-				my = Math.floor(e.y * 19.2 / size - 0.35);
+				var b = e.target.getBoundingClientRect();
+				mx = Math.floor((e.x - b.left) * 19.2 / size - 0.1);
+				my = Math.floor((e.y - b.top) * 19.2 / size - 0.1);
 			}
 			c.onmousedown = function(e) {
 				if (!moved)
@@ -176,18 +189,22 @@
 				game.pass();
 				calc();
 			}
-
+		
 			function calc() {
 				moved = true;
-				document.querySelector("button").style.display = 'none';
-				if (game.passes >= 2) { document.querySelector("div").innerHTML = game.score(); return; }
+				document.querySelector("#goPass").style.display = 'none';
+				if (game.passes >= 2) {
+					document.querySelector("#goLink").style.display = 'none';
+					document.querySelector("#goScore").innerHTML = game.score();
+					return;
+				}
 				var domain = (/^[^?]*/).exec(window.location.href)[0];
 				var url = domain + "?s=" + game.turns
-				document.querySelector("a").href = url;
-				document.querySelector("a").innerHTML = url;
+				document.querySelector("#goLink").href = url;
+				document.querySelector("#goLink").innerHTML = url;
 			}
-
-
+		
+		
 			function loop() {
 				ctx.drawImage(background, 0, 0, size, size);
 				game.draw();
@@ -195,7 +212,7 @@
 					game.pre(mx, my);
 				requestAnimationFrame(loop);
 			}
-
+		
 			background.onload = loop();
 		</script>
 	</body>

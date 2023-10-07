@@ -32,7 +32,7 @@
 					this.turns = "";
 					this.passes = 0;
 					for (var i = 0; i < turns.length; i += 2)
-						if (turns[i] + turns[i + 1] == "au")
+						if (turns[i] + turns[i + 1] == "ua")
 							this.pass();
 						else if (!this.move(this.cto(turns.charCodeAt(i) - 97), this.cto(turns.charCodeAt(i + 1) - 97)))
 							break;
@@ -65,7 +65,7 @@
 				pass() {
 					if (this.passes++ >= 2) return;
 					this.turn = !this.turn;
-					this.turns += "au";
+					this.turns += "ua";
 				}
 		
 				test(x, y) {
@@ -163,7 +163,7 @@
 			let game = new Go(state);
 			if (game.turns.length >= 2) {
 				var action;
-				if (game.turns[game.turns.length - 2] == 'u') action = "Pass";
+				if (game.turns[game.turns.length - 2] + game.turns[game.turns.length - 1] == "ua") action = "Pass";
 				else action =
 					"abcdefghjklmnopqrst"[game.cto(game.turns.charCodeAt(game.turns.length - 2) - 97)] +
 					(game.cto(game.turns.charCodeAt(game.turns.length - 1) - 97) + 1)

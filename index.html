@@ -52,9 +52,9 @@
 							ctx.arc((x + 0.6) * size / 19.2, (y + 0.6) * size / 19.2, size / 50, 0, 2 * Math.PI);
 							ctx.fill();
 						}
-					if (this.turns.length > 0 && this.turns[-2] + this.turns[-1] != "ua") {
-						var x = this.cto(this.turns.charCodeAt(-2) - 97);
-						var y = this.cto(this.turns.charCodeAt(-1) - 97);
+					if (this.turns.length > 0 && this.turns[this.turns.length - 2] + this.turns[this.turns.length - 1] != "ua") {
+						var x = this.cto(this.turns.charCodeAt(this.turns.length - 2) - 97);
+						var y = this.cto(this.turns.charCodeAt(this.turns.length - 1) - 97);
 						ctx.fillStyle = "#f00";
 						ctx.beginPath();
 						ctx.arc((x + 0.6) * size / 19.2, (y + 0.6) * size / 19.2, size / 200, 0, 2 * Math.PI);

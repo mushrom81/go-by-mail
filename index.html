@@ -11,23 +11,26 @@
 		<script>
 			var c = document.querySelector("#goScreen");
 			var ctx = c.getContext("2d");
-			
-			var size = 480;
+
+			var biggest = Math.min(window.innerWidth, window.innerHeight)
+			var size = biggest * 0.8;
 			c.width = size;
 			c.height = size;
-		
-			var background = new Image();
-			background.src = "background.webp"
-			
+
 			var params = new URLSearchParams(location.search);
+
 			var state = params.get("s");
 			if (!state) state = "";
-		
+
+			var dims = params.get("d");
+			dims = Math.round(Number(dims));
+			if (dims < 2 || 19 < dims) dims = 19;
+
 			class Go {
 				constructor(turns = "") {
 					this.boards = [];
 					this.boards.push([]);
-					for (var i = 0; i < 19 * 19; i++) this.boards[0].push(0);
+					for (var i = 0; i < dims * dims; i++) this.boards[0].push(0);
 					this.turn = true;
 					this.turns = "";
 					this.passes = 0;
@@ -37,19 +40,32 @@
 						else if (!this.move(this.cto(turns.charCodeAt(i) - 97), this.cto(turns.charCodeAt(i + 1) - 97)))
 							break;
 				}
-				
+
 				cto(c) { if (c < 8) return c; else return c - 1; }
-		
-				toi(x, y) { return (0 <= x && x < 19 && 0 <= y && y < 19) ? x + y * 19 : -1; }
-		
+
+				toi(x, y) { return (0 <= x && x < dims && 0 <= y && y < dims) ? x + y * dims : -1; }
+
+				tocoord(a) { return (a + 0.6) * size / (dims + 0.2); }
+
 				draw() {
-					for (var x = 0; x < 19; x++)
-						for (var y = 0; y < 19; y++) {
+					ctx.fillStyle = "#eb5";
+					ctx.fillRect(0, 0, c.width, c.height);
+					ctx.strokeStyle = "#000";
+					ctx.beginPath()
+					for (var xy = 0; xy < dims; xy++) {
+						ctx.moveTo(this.tocoord(0), this.tocoord(xy));
+						ctx.lineTo(this.tocoord(dims-1), this.tocoord(xy));
+						ctx.moveTo(this.tocoord(xy), this.tocoord(0));
+						ctx.lineTo(this.tocoord(xy), this.tocoord(dims-1));
+					}
+					ctx.stroke()
+					for (var x = 0; x < dims; x++)
+						for (var y = 0; y < dims; y++) {
 							var piece = this.boards[this.boards.length - 1][this.toi(x, y)];
 							if (piece == 0) continue;
 							ctx.fillStyle = piece == 1 ? "#000" : "#fff";
 							ctx.beginPath();
-							ctx.arc((x + 0.6) * size / 19.2, (y + 0.6) * size / 19.2, size / 50, 0, 2 * Math.PI);
+							ctx.arc(this.tocoord(x), this.tocoord(y), size / (2.5 * dims), 0, 2 * Math.PI);
 							ctx.fill();
 						}
 					if (this.turns.length > 0 && this.turns[this.turns.length - 2] + this.turns[this.turns.length - 1] != "ua") {
@@ -57,25 +73,25 @@
 						var y = this.cto(this.turns.charCodeAt(this.turns.length - 1) - 97);
 						ctx.fillStyle = "#f00";
 						ctx.beginPath();
-						ctx.arc((x + 0.6) * size / 19.2, (y + 0.6) * size / 19.2, size / 200, 0, 2 * Math.PI);
+						ctx.arc(this.tocoord(x), this.tocoord(y), size / (15 * dims), 0, 2 * Math.PI);
 						ctx.fill();
 					}
 				}
-		
+
 				pre(x, y) {
 					if (!this.test(x, y)) return;
 					ctx.fillStyle = this.turn ? "#0008" : "#fff8";
 					ctx.beginPath();
-					ctx.arc((x + 0.6) * size / 19.2, (y + 0.6) * size / 19.2, size / 50, 0, 2 * Math.PI);
+					ctx.arc(this.tocoord(x), this.tocoord(y), size / (2.5 * dims), 0, 2 * Math.PI);
 					ctx.fill();
 				}
-		
+
 				pass() {
 					if (this.passes++ >= 2) return;
 					this.turn = !this.turn;
 					this.turns += "ua";
 				}
-		
+
 				test(x, y) {
 					if (!this.move(x, y)) return false;
 					this.boards.pop();
@@ -83,7 +99,7 @@
 					this.turns = this.turns.substring(0, this.turns.length - 2);
 					return true;
 				}
-		
+
 				move(x, y) {
 					if (this.passes++ >= 2) return false;
 					this.passes = 0;
@@ -91,20 +107,20 @@
 					if (i == -1 || this.boards[this.boards.length - 1][i] != 0) return false;
 					this.boards.push(this.boards[this.boards.length - 1].slice());
 					this.boards[this.boards.length - 1][i] = this.turn ? 1 : 2;
-		
+
 					this.capture(this.turn ? 2 : 1);
 					if (this.capture(this.turn ? 1 : 2))
 						return this.boards.pop() === false;
-		
+
 					for (var i = 0; i < this.boards.length - 1; i++)
 						if (this.boards[i].join("") == this.boards[this.boards.length - 1].join(""))
 							return this.boards.pop() === false;
-					
+
 					this.turn = !this.turn;
 					this.turns += "abcdefghjklmnopqrst"[x] + "abcdefghjklmnopqrst"[y];
 					return true;
 				}
-		
+
 				capture(color) {
 					var captured = false;
 					for (var x = 0; x < 19; x++)
@@ -115,7 +131,7 @@
 						}
 					return captured;
 				}
-		
+
 				check(x, y, color) {
 					var i = this.toi(x, y);
 					if (this.checked.indexOf(i) != -1) return false;
@@ -128,7 +144,7 @@
 							|| this.check(x, y + 1, color)
 							|| this.check(x, y - 1, color);
 				}
-		
+
 				kill(x, y, color) {
 					var i = this.toi(x, y);
 					if (i == -1) return false;
@@ -140,7 +156,7 @@
 					this.kill(x, y - 1, color);
 					return true;
 				}
-		
+
 				score() {
 					var black = 0;
 					var white = 0;
@@ -153,7 +169,7 @@
 						}
 					return black + " - " + (white + 6.5);
 				}
-		
+
 				territory(x, y, color) {
 					var i = this.toi(x, y);
 					if (this.checked.indexOf(i) != -1) return true;
@@ -167,7 +183,7 @@
 							&& this.check(x, y - 1, color);
 				}
 			}
-		
+
 			let game = new Go(state);
 			if (game.turns.length >= 2) {
 				var action;
@@ -179,13 +195,13 @@
 			}
 			var moved = false;
 			var mx, my;
-		
+
 			if (game.passes >= 2) calc();
-		
+
 			c.onmousemove = function(e) {
 				var b = e.target.getBoundingClientRect();
-				mx = Math.floor((e.x - b.left) * 19.2 / size - 0.1);
-				my = Math.floor((e.y - b.top) * 19.2 / size - 0.1);
+				mx = Math.floor((e.x - b.left) * (dims + 0.2) / size - 0.1);
+				my = Math.floor((e.y - b.top) * (dims + 0.2) / size - 0.1);
 			}
 			c.onmousedown = function(e) {
 				if (!moved)
@@ -197,7 +213,7 @@
 				game.pass();
 				calc();
 			}
-		
+
 			function calc() {
 				moved = true;
 				document.querySelector("#goPass").style.display = 'none';
@@ -207,21 +223,19 @@
 					return;
 				}
 				var domain = (/^[^?]*/).exec(window.location.href)[0];
-				var url = domain + "?s=" + game.turns
+				var url = domain + "?d=" + dims + "&s=" + game.turns
 				document.querySelector("#goLink").href = url;
 				document.querySelector("#goLink").innerHTML = url;
 			}
-		
-		
+
+
 			function loop() {
-				ctx.drawImage(background, 0, 0, size, size);
 				game.draw();
 				if (!moved)
 					game.pre(mx, my);
 				requestAnimationFrame(loop);
 			}
-		
-			background.onload = loop();
+			loop();
 		</script>
 	</body>
 </html>

@@ -9,6 +9,8 @@
 			<a id="goLink"></a>
 		</p>
 		<script>
+			var load = Date.now();
+
 			var c = document.querySelector("#goScreen");
 			var ctx = c.getContext("2d");
 
@@ -22,23 +24,98 @@
 			var state = params.get("s");
 			if (!state) state = "";
 
+			var alphabet = "abcdefghjklmnopqrstvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.~iu"
+			var extra = "`!@$%^()=[]{}|\\;:',<.>/*";
+
 			var dims = params.get("d");
+			if (!dims) dims = 19;
 			dims = Math.round(Number(dims));
-			if (dims < 2 || 19 < dims) dims = 19;
+			if (dims < 2) dims = 2;
+			if (dims > alphabet.length - 1) dims = alphabet.length - 1;
+
+			function encode(dim, turns) {
+				var string = "";
+				if (dim <= Math.floor(Math.sqrt(alphabet.length - 1)))
+					for (var i = 0; i < turns.length; i++) {
+						if (!turns[i]) string += alphabet[alphabet.length - 1];
+						else {
+							var x = turns[i][0];
+							var y = turns[i][1];
+							string += alphabet[x + y * dim];
+						}
+					}
+				else if (dim <= Math.floor(Math.sqrt((alphabet + extra).length - 1)))
+					for (var i = 0; i < turns.length; i++) {
+						if (!turns[i]) string += (alphabet + extra)[(alphabet + extra).length - 1];
+						else {
+							var x = turns[i][0];
+							var y = turns[i][1];
+							string += (alphabet + extra)[x + y * dim];
+						}
+					}
+				else
+					for (var i = 0; i < turns.length; i++) {
+						if (!turns[i]) string += alphabet[alphabet.length - 1] + alphabet[0];
+						else {
+							var x = turns[i][0];
+							var y = turns[i][1];
+							string += alphabet[x] + alphabet[y];
+						}
+					}
+				return string;
+			}
+
+			function decode(dim, string) {
+				var turns = [];
+				if (dim <= Math.floor(Math.sqrt(alphabet.length - 1)))
+					for (var i = 0; i < string.length; i++) {
+						var xy = alphabet.indexOf(string[i]);
+						if (xy == alphabet.length - 1) turns.push(false);
+						else {
+							var x = xy % dim;
+							var y = (xy - x) / dim;
+							turns.push([x, y]);
+						}
+					}
+				else if (dim <= Math.floor(Math.sqrt((alphabet + extra).length - 1)))
+					for (var i = 0; i < string.length; i++) {
+						var xy = (alphabet + extra).indexOf(string[i]);
+						if (xy == (alphabet + extra).length - 1) turns.push(false);
+						else {
+							var x = xy % dim;
+							var y = (xy - x) / dim;
+							turns.push([x, y]);
+						}
+					}
+				else
+					for (var i = 0; i < string.length; i += 2) {
+						var c1 = string[i];
+						var c2 = string[i + 1];
+						if (c1 == 'u' && c2 == 'a') turns.push(false);
+						else {
+							var x = alphabet.indexOf(c1);
+							var y = alphabet.indexOf(c2);
+							turns.push([x, y]);
+						}
+					}
+				return turns;
+			}
 
 			class Go {
-				constructor(turns = "") {
+				constructor(string = "") {
 					this.boards = [];
 					this.boards.push([]);
 					for (var i = 0; i < dims * dims; i++) this.boards[0].push(0);
 					this.turn = true;
-					this.turns = "";
+					this.turns = [];
 					this.passes = 0;
-					for (var i = 0; i < turns.length; i += 2)
-						if (turns[i] + turns[i + 1] == "ua")
+					var turns = decode(dims, string)
+					for (var i = 0; i < turns.length; i++)
+						if (!turns[i])
 							this.pass();
-						else if (!this.move(this.cto(turns.charCodeAt(i) - 97), this.cto(turns.charCodeAt(i + 1) - 97)))
-							break;
+					  else
+							if (!this.move(turns[i][0], turns[i][1]))
+								break;
 				}
 
 				cto(c) { if (c < 8) return c; else return c - 1; }
@@ -68,9 +145,11 @@
 							ctx.arc(this.tocoord(x), this.tocoord(y), size / (2.5 * dims), 0, 2 * Math.PI);
 							ctx.fill();
 						}
-					if (this.turns.length > 0 && this.turns[this.turns.length - 2] + this.turns[this.turns.length - 1] != "ua") {
-						var x = this.cto(this.turns.charCodeAt(this.turns.length - 2) - 97);
-						var y = this.cto(this.turns.charCodeAt(this.turns.length - 1) - 97);
+					if (this.turns.length > 0
+					 && this.turns[this.turns.length-1]
+					 && Date.now() - load < 2000) {
+						var x = this.turns[this.turns.length-1][0];
+						var y = this.turns[this.turns.length-1][1];
 						ctx.fillStyle = "#f00";
 						ctx.beginPath();
 						ctx.arc(this.tocoord(x), this.tocoord(y), size / (15 * dims), 0, 2 * Math.PI);
@@ -89,14 +168,14 @@
 				pass() {
 					if (this.passes++ >= 2) return;
 					this.turn = !this.turn;
-					this.turns += "ua";
+					this.turns.push(false);
 				}
 
 				test(x, y) {
 					if (!this.move(x, y)) return false;
 					this.boards.pop();
 					this.turn = !this.turn;
-					this.turns = this.turns.substring(0, this.turns.length - 2);
+					this.turns.pop();
 					return true;
 				}
 
@@ -117,7 +196,7 @@
 							return this.boards.pop() === false;
 
 					this.turn = !this.turn;
-					this.turns += "abcdefghjklmnopqrst"[x] + "abcdefghjklmnopqrst"[y];
+					this.turns.push([x, y]);
 					return true;
 				}
 
@@ -153,6 +232,7 @@
 					this.kill(x + 1, y, color);
 					this.kill(x - 1, y, color);
 					this.kill(x, y + 1, color);
+							this.checked = [];
 					this.kill(x, y - 1, color);
 					return true;
 				}
@@ -160,14 +240,14 @@
 				score() {
 					var black = 0;
 					var white = 0;
-					for (var x = 0; x < 19; x++)
-						for (var y = 0; y < 19; y++) {
+					for (var x = 0; x < dims; x++)
+						for (var y = 0; y < dims; y++) {
 							this.checked = [];
-							black += this.territory(x, y, 1) ? 1 : 0;
+							if (this.territory(x, y, 1)) black++;
 							this.checked = [];
-							white += this.territory(x, y, 2) ? 1 : 0;
+							if (this.territory(x, y, 2)) white++;
 						}
-					return black + " - " + (white + 6.5);
+					return "(Area) Score: ●" + black + "- ○" + white;
 				}
 
 				territory(x, y, color) {
@@ -176,21 +256,22 @@
 					this.checked.push(i);
 					if (i == -1) return true;
 					if (this.boards[this.boards.length - 1][i] == color) return true;
-					if (this.boards[this.boards.length - 1][i] != color) return false;
-					return this.check(x + 1, y, color)
-					    && this.check(x - 1, y, color)
-							&& this.check(x, y + 1, color)
-							&& this.check(x, y - 1, color);
+					if (this.boards[this.boards.length - 1][i] == 0)
+						return this.territory(x + 1, y, color)
+						    && this.territory(x - 1, y, color)
+						    && this.territory(x, y + 1, color)
+						    && this.territory(x, y - 1, color);
+					return false;
 				}
 			}
 
 			let game = new Go(state);
-			if (game.turns.length >= 2) {
+			if (game.turns.length > 0) {
 				var action;
-				if (game.turns[game.turns.length - 2] + game.turns[game.turns.length - 1] == "ua") action = "Pass";
+				if (!game.turns[game.turns.length - 1]) action = "Pass";
 				else action =
-					"abcdefghjklmnopqrst"[game.cto(game.turns.charCodeAt(game.turns.length - 2) - 97)] +
-					(game.cto(game.turns.charCodeAt(game.turns.length - 1) - 97) + 1)
+					"abcdefghjklmnopqrst"[game.cto(game.turns[game.turns.length - 1][0])] +
+					                      game.cto(game.turns[game.turns.length - 1][1]);
 				document.querySelector("#goLink").innerHTML = (game.turn ? "White: " : "Black: ") + action;
 			}
 			var moved = false;
@@ -223,11 +304,10 @@
 					return;
 				}
 				var domain = (/^[^?]*/).exec(window.location.href)[0];
-				var url = domain + "?d=" + dims + "&s=" + game.turns
+				var url = domain + "?d=" + dims + "&s=" + encode(dims, game.turns);
 				document.querySelector("#goLink").href = url;
 				document.querySelector("#goLink").innerHTML = url;
 			}
-
 
 			function loop() {
 				game.draw();
